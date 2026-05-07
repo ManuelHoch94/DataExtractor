@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(winget install --id GitHub.cli --accept-package-agreements --accept-source-agreements 2>&1)",
+      "PowerShell($env:PATH = [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"User\"\\); gh auth status)",
+      "PowerShell(cd \"C:\\\\DataExtractor\\\\DataExtractor\\\\.claude\\\\worktrees\\\\wonderful-jemison-f7600b\"; $env:ANTHROPIC_API_KEY = \"sk-test-ci\"; python -m pytest tests/ --tb=short -q 2>&1 | Select-Object -Last 30)"
+    ]
+  }
+}
