@@ -14,6 +14,9 @@ dependencies = [
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
     "python-dotenv>=1.0.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]
@@ -22,8 +25,12 @@ dev = [
     "pytest-cov>=5.0.0",
     "pytest-mock>=3.12.0",
     "pytest-asyncio>=0.23.0",
+    "httpx>=0.27.0",
     "ruff>=0.4.0",
 ]
+
+[project.scripts]
+data-extractor = "main:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
