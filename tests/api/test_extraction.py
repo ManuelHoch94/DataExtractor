@@ -180,3 +180,76 @@ def test_inline_schema_takes_precedence_over_name(
     })}
     r = api_client.post("/api/v1/extract", files=files, data=data)
     assert r.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# schema_file upload
+# ---------------------------------------------------------------------------
+
+def test_extract_with_schema_file_simple(api_client: TestClient, tmp_pdf: Path):
+    schema_json = json.dumps({"invoice_number": "The invoice ID"}).encode()
+    files = {
+        "file": ("doc.pdf", tmp_pdf.read_bytes(), "application/pdf"),
+        "schema_file": ("schema.json", schema_json, "application/json"),
+    }
+    r = api_client.post("/api/v1/extract", files=files)
+    assert r.status_code == 200
+
+
+def test_extract_with_schema_file_full_format(api_client: TestClient, tmp_pdf: Path):
+    schema_json = json.dumps({
+        "name": "invoice",
+        "description": "Standard invoice",
+        "fields": {"invoice_number": "The invoice ID"},
+    }).encode()
+    files = {
+        "file": ("doc.pdf", tmp_pdf.read_bytes(), "application/pdf"),
+        "schema_file": ("schema.json", schema_json, "application/json"),
+    }
+    r = api_client.post("/api/v1/extract", files=files)
+    assert r.status_code == 200
+
+
+def test_schema_file_takes_precedence_over_inline(
+    api_client: TestClient, tmp_pdf: Path
+):
+    schema_json = json.dumps({"invoice_number": "From file"}).encode()
+    files = {
+        "file": ("doc.pdf", tmp_pdf.read_bytes(), "application/pdf"),
+        "schema_file": ("schema.json", schema_json, "application/json"),
+    }
+    data = {"request": json.dumps({"schema_definition": {"vendor": "Should be ignored"}})}
+    r = api_client.post("/api/v1/extract", files=files, data=data)
+    assert r.status_code == 200
+
+
+def test_schema_file_takes_precedence_over_name(
+    api_client: TestClient, tmp_pdf: Path, schema_store: InMemorySchemaStore
+):
+    schema_store.save(SchemaEntry(name="invoice", fields={"vendor": "Should be ignored"}))
+    schema_json = json.dumps({"invoice_number": "From file"}).encode()
+    files = {
+        "file": ("doc.pdf", tmp_pdf.read_bytes(), "application/pdf"),
+        "schema_file": ("schema.json", schema_json, "application/json"),
+    }
+    data = {"request": json.dumps({"schema_name": "invoice"})}
+    r = api_client.post("/api/v1/extract", files=files, data=data)
+    assert r.status_code == 200
+
+
+def test_invalid_schema_file_returns_400(api_client: TestClient, tmp_pdf: Path):
+    files = {
+        "file": ("doc.pdf", tmp_pdf.read_bytes(), "application/pdf"),
+        "schema_file": ("schema.json", b"not valid json", "application/json"),
+    }
+    r = api_client.post("/api/v1/extract", files=files)
+    assert r.status_code == 400
+
+
+def test_schema_file_wrong_structure_returns_400(api_client: TestClient, tmp_pdf: Path):
+    files = {
+        "file": ("doc.pdf", tmp_pdf.read_bytes(), "application/pdf"),
+        "schema_file": ("schema.json", b"[1, 2, 3]", "application/json"),
+    }
+    r = api_client.post("/api/v1/extract", files=files)
+    assert r.status_code == 400
