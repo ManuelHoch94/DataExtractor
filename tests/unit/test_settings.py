@@ -15,10 +15,21 @@ def _base_env(monkeypatch: pytest.MonkeyPatch, **extra: str) -> None:
 # Provider: openai (default)
 # ---------------------------------------------------------------------------
 
-def test_openai_provider_requires_api_key(monkeypatch: pytest.MonkeyPatch):
-    _base_env(monkeypatch)
-    with pytest.raises((ValidationError, ValueError)):
-        Settings()
+def test_openai_provider_requires_api_key():
+    # Test the model_validator logic directly, bypassing env/file loading
+    instance = Settings.model_construct(
+        llm_provider="openai",
+        openai_api_key=None,
+        anthropic_api_key=None,
+        openai_model="gpt-4o",
+        openai_base_url=None,
+        anthropic_model="claude-sonnet-4-6",
+        extraction_confidence_threshold=0.5,
+        extraction_max_tokens=2048,
+        log_level="INFO",
+    )
+    with pytest.raises(ValueError, match="openai_api_key is required"):
+        instance._require_active_provider_key()
 
 
 def test_openai_provider_valid(monkeypatch: pytest.MonkeyPatch):

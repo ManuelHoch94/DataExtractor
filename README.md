@@ -32,7 +32,7 @@ PDF file
 pip install -e ".[dev]"
 
 # 2. Configure
-cp .env.example .env
+cp .env .env
 # Add your ANTHROPIC_API_KEY to .env
 
 # 3. Run tests

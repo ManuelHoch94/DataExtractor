@@ -8,10 +8,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 from data_extractor.api.app import create_app
-from data_extractor.api.dependencies import get_orchestrator, get_settings
+from data_extractor.api.dependencies import get_orchestrator, get_schema_store, get_settings
 from data_extractor.config.settings import Settings
 from data_extractor.core.exceptions import DataExtractorError, ReaderError
 from data_extractor.core.models import ExtractedField, ExtractionRequest, ExtractionResult
+from data_extractor.registry.models import SchemaEntry
+from data_extractor.registry.store import InMemorySchemaStore
 
 
 # ---------------------------------------------------------------------------
@@ -142,3 +144,39 @@ def test_swagger_ui_available(api_client: TestClient):
 
 def test_redoc_available(api_client: TestClient):
     assert api_client.get("/redoc").status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# schema_name resolution
+# ---------------------------------------------------------------------------
+
+def test_extract_with_schema_name(api_client: TestClient, tmp_pdf: Path, schema_store: InMemorySchemaStore):
+    schema_store.save(SchemaEntry(
+        name="invoice",
+        fields={"invoice_number": "The invoice ID"},
+    ))
+    files = {"file": ("doc.pdf", tmp_pdf.read_bytes(), "application/pdf")}
+    data = {"request": json.dumps({"schema_name": "invoice"})}
+    r = api_client.post("/api/v1/extract", files=files, data=data)
+    assert r.status_code == 200
+
+
+def test_extract_schema_name_not_found(api_client: TestClient, tmp_pdf: Path):
+    files = {"file": ("doc.pdf", tmp_pdf.read_bytes(), "application/pdf")}
+    data = {"request": json.dumps({"schema_name": "nonexistent"})}
+    r = api_client.post("/api/v1/extract", files=files, data=data)
+    assert r.status_code == 400
+    assert "not found in registry" in r.json()["detail"]
+
+
+def test_inline_schema_takes_precedence_over_name(
+    api_client: TestClient, tmp_pdf: Path, schema_store: InMemorySchemaStore
+):
+    schema_store.save(SchemaEntry(name="invoice", fields={"vendor": "Vendor name"}))
+    files = {"file": ("doc.pdf", tmp_pdf.read_bytes(), "application/pdf")}
+    data = {"request": json.dumps({
+        "schema_name": "invoice",
+        "schema_definition": {"invoice_number": "The invoice ID"},
+    })}
+    r = api_client.post("/api/v1/extract", files=files, data=data)
+    assert r.status_code == 200

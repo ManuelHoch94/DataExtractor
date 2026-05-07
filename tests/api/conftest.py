@@ -10,9 +10,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from data_extractor.api.app import create_app
-from data_extractor.api.dependencies import get_orchestrator, get_settings
+from data_extractor.api.dependencies import get_orchestrator, get_schema_store, get_settings
 from data_extractor.config.settings import Settings
 from data_extractor.core.models import ExtractedField, ExtractionResult, ExtractionRequest
+from data_extractor.registry.store import InMemorySchemaStore
 
 
 def _make_settings(provider: str = "openai") -> Settings:
@@ -52,19 +53,25 @@ def sample_fields() -> list[ExtractedField]:
 
 
 @pytest.fixture()
-def api_client(tmp_pdf: Path, sample_fields: list[ExtractedField]) -> TestClient:
-    """TestClient with mocked settings and orchestrator."""
+def schema_store() -> InMemorySchemaStore:
+    return InMemorySchemaStore()
+
+
+@pytest.fixture()
+def api_client(tmp_pdf: Path, sample_fields: list[ExtractedField], schema_store: InMemorySchemaStore) -> TestClient:
+    """TestClient with mocked settings, orchestrator, and fresh schema store."""
     app = create_app()
     settings = _make_settings()
     orchestrator = _make_orchestrator_mock(sample_fields)
 
     app.dependency_overrides[get_settings] = lambda: settings
     app.dependency_overrides[get_orchestrator] = lambda: orchestrator
+    app.dependency_overrides[get_schema_store] = lambda: schema_store
     return TestClient(app)
 
 
 @pytest.fixture()
-def api_client_empty_result(tmp_pdf: Path) -> TestClient:
+def api_client_empty_result(tmp_pdf: Path, schema_store: InMemorySchemaStore) -> TestClient:
     """TestClient whose orchestrator returns zero fields."""
     app = create_app()
     settings = _make_settings()
@@ -72,4 +79,5 @@ def api_client_empty_result(tmp_pdf: Path) -> TestClient:
 
     app.dependency_overrides[get_settings] = lambda: settings
     app.dependency_overrides[get_orchestrator] = lambda: orchestrator
+    app.dependency_overrides[get_schema_store] = lambda: schema_store
     return TestClient(app)

@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import data_extractor
 from data_extractor.api.middleware import RequestLoggingMiddleware, domain_exception_handler
-from data_extractor.api.routers import extraction, health
+from data_extractor.api.routers import extraction, health, schemas
 from data_extractor.core.exceptions import DataExtractorError
 
 logger = logging.getLogger(__name__)
@@ -71,6 +71,12 @@ def create_app(*, cors_origins: list[str] | None = None) -> FastAPI:
 
     # Routers
     app.include_router(health.router, prefix=_API_PREFIX)
+    app.include_router(schemas.router, prefix=_API_PREFIX)
     app.include_router(extraction.router, prefix=_API_PREFIX)
+
+    @app.get("/", include_in_schema=False)
+    def root():
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/docs")
 
     return app
