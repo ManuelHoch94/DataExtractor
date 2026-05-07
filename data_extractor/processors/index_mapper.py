@@ -4,10 +4,9 @@ import json
 import logging
 from typing import Any
 
-import anthropic
-
 from data_extractor.core.exceptions import ProcessorError
 from data_extractor.core.models import ExtractedField
+from data_extractor.llm.base import BaseLLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -38,21 +37,21 @@ _USER_TEMPLATE = """\
 
 
 class IndexMapper:
-    """Maps document text to structured field indexes using the Claude API.
+    """Maps document text to structured field indexes via any LLM backend.
 
-    This component sends the cleaned document text together with a
-    user-defined schema to Claude and parses the structured JSON response
-    into :class:`~data_extractor.core.models.ExtractedField` objects.
+    The concrete LLM provider is injected as a :class:`~data_extractor.llm.BaseLLMClient`,
+    so the extraction logic is fully decoupled from the provider.  Swap
+    :class:`~data_extractor.llm.OpenAIClient` for
+    :class:`~data_extractor.llm.AnthropicClient` (or any custom implementation)
+    without touching this class.
     """
 
     def __init__(
         self,
-        client: anthropic.Anthropic,
-        model: str = "claude-sonnet-4-6",
+        llm_client: BaseLLMClient,
         max_tokens: int = 2048,
     ) -> None:
-        self._client = client
-        self._model = model
+        self._client = llm_client
         self._max_tokens = max_tokens
 
     def map(
@@ -61,7 +60,7 @@ class IndexMapper:
         schema_definition: dict[str, Any],
         confidence_threshold: float = 0.0,
     ) -> list[ExtractedField]:
-        """Call Claude to extract *schema_definition* fields from *text*.
+        """Call the LLM to extract *schema_definition* fields from *text*.
 
         Args:
             text: Cleaned document text.
@@ -79,28 +78,22 @@ class IndexMapper:
             document_text=text,
         )
 
-        try:
-            response = self._client.messages.create(
-                model=self._model,
-                max_tokens=self._max_tokens,
-                system=_SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": user_message}],
-            )
-        except anthropic.APIError as exc:
-            raise ProcessorError(f"Anthropic API call failed: {exc}") from exc
-
-        raw_content = response.content[0].text if response.content else ""
+        response = self._client.complete(
+            system_prompt=_SYSTEM_PROMPT,
+            user_prompt=user_message,
+            max_tokens=self._max_tokens,
+        )
 
         try:
-            raw_fields: list[dict[str, Any]] = json.loads(raw_content)
+            raw_fields: list[dict[str, Any]] = json.loads(response.text)
         except json.JSONDecodeError as exc:
             raise ProcessorError(
-                f"Claude returned non-JSON output: {raw_content!r}"
+                f"LLM returned non-JSON output: {response.text!r}"
             ) from exc
 
         if not isinstance(raw_fields, list):
             raise ProcessorError(
-                f"Expected JSON array from Claude, got {type(raw_fields).__name__}"
+                f"Expected JSON array from LLM, got {type(raw_fields).__name__}"
             )
 
         results: list[ExtractedField] = []

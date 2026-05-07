@@ -3,30 +3,30 @@ from __future__ import annotations
 import json
 from unittest.mock import MagicMock
 
-import anthropic
 import pytest
 
 from data_extractor.core.exceptions import ProcessorError
 from data_extractor.core.models import ExtractedField
+from data_extractor.llm.base import BaseLLMClient, LLMResponse
 from data_extractor.processors.index_mapper import IndexMapper
 
 
-def _make_mapper(client: MagicMock) -> IndexMapper:
-    return IndexMapper(client=client, model="claude-sonnet-4-6", max_tokens=512)
+def _make_mapper(client: BaseLLMClient) -> IndexMapper:
+    return IndexMapper(llm_client=client, max_tokens=512)
 
 
-def _mock_response(fields: list[dict]) -> MagicMock:
-    resp = MagicMock()
-    resp.content = [MagicMock(text=json.dumps(fields))]
-    return resp
+def _mock_client(fields: list[dict]) -> MagicMock:
+    client = MagicMock(spec=BaseLLMClient)
+    client.complete.return_value = LLMResponse(text=json.dumps(fields))
+    return client
 
 
 # ---------------------------------------------------------------------------
 # Happy path
 # ---------------------------------------------------------------------------
 
-def test_map_returns_extracted_fields(mock_anthropic_client: MagicMock):
-    mapper = _make_mapper(mock_anthropic_client)
+def test_map_returns_extracted_fields(mock_llm_client: MagicMock):
+    mapper = _make_mapper(mock_llm_client)
     result = mapper.map(
         text="Invoice Number: INV-001",
         schema_definition={"invoice_number": "The invoice ID"},
@@ -35,16 +35,15 @@ def test_map_returns_extracted_fields(mock_anthropic_client: MagicMock):
     assert all(isinstance(f, ExtractedField) for f in result)
 
 
-def test_map_empty_schema_returns_empty(mock_anthropic_client: MagicMock):
-    mapper = _make_mapper(mock_anthropic_client)
+def test_map_empty_schema_returns_empty(mock_llm_client: MagicMock):
+    mapper = _make_mapper(mock_llm_client)
     result = mapper.map(text="some text", schema_definition={})
     assert result == []
-    mock_anthropic_client.messages.create.assert_not_called()
+    mock_llm_client.complete.assert_not_called()
 
 
 def test_map_applies_confidence_threshold():
-    client = MagicMock()
-    client.messages.create.return_value = _mock_response([
+    client = _mock_client([
         {"name": "high", "value": "yes", "confidence": 0.9, "source_text": None, "page_number": None},
         {"name": "low", "value": "maybe", "confidence": 0.2, "source_text": None, "page_number": None},
     ])
@@ -54,41 +53,36 @@ def test_map_applies_confidence_threshold():
     assert result[0].name == "high"
 
 
+def test_map_passes_max_tokens_to_client():
+    client = _mock_client([])
+    mapper = IndexMapper(llm_client=client, max_tokens=1024)
+    mapper.map("text", {"field": "desc"})
+    _, kwargs = client.complete.call_args
+    assert kwargs["max_tokens"] == 1024
+
+
 # ---------------------------------------------------------------------------
 # Error handling
 # ---------------------------------------------------------------------------
 
-def test_map_raises_processor_error_on_api_failure():
-    client = MagicMock()
-    client.messages.create.side_effect = anthropic.APIConnectionError(request=MagicMock())
-    mapper = _make_mapper(client)
-    with pytest.raises(ProcessorError, match="Anthropic API call failed"):
-        mapper.map("text", {"field": "desc"})
-
-
 def test_map_raises_on_non_json_response():
-    client = MagicMock()
-    resp = MagicMock()
-    resp.content = [MagicMock(text="not json at all")]
-    client.messages.create.return_value = resp
+    client = MagicMock(spec=BaseLLMClient)
+    client.complete.return_value = LLMResponse(text="not json at all")
     mapper = _make_mapper(client)
     with pytest.raises(ProcessorError, match="non-JSON"):
         mapper.map("text", {"field": "desc"})
 
 
 def test_map_raises_on_non_array_json():
-    client = MagicMock()
-    resp = MagicMock()
-    resp.content = [MagicMock(text='{"key": "value"}')]
-    client.messages.create.return_value = resp
+    client = MagicMock(spec=BaseLLMClient)
+    client.complete.return_value = LLMResponse(text='{"key": "value"}')
     mapper = _make_mapper(client)
     with pytest.raises(ProcessorError, match="Expected JSON array"):
         mapper.map("text", {"field": "desc"})
 
 
 def test_map_skips_malformed_entries(caplog):
-    client = MagicMock()
-    client.messages.create.return_value = _mock_response([
+    client = _mock_client([
         {"name": "ok", "value": "v", "confidence": 0.8, "source_text": None, "page_number": None},
         {"bad_key": "no name field"},
     ])
@@ -99,11 +93,9 @@ def test_map_skips_malformed_entries(caplog):
     assert result[0].name == "ok"
 
 
-def test_map_empty_content_raises():
-    client = MagicMock()
-    resp = MagicMock()
-    resp.content = []
-    client.messages.create.return_value = resp
+def test_map_propagates_processor_error_from_client():
+    client = MagicMock(spec=BaseLLMClient)
+    client.complete.side_effect = ProcessorError("upstream failure")
     mapper = _make_mapper(client)
-    with pytest.raises(ProcessorError):
+    with pytest.raises(ProcessorError, match="upstream failure"):
         mapper.map("text", {"field": "desc"})

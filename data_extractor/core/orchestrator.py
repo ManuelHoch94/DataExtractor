@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import logging
 
-import anthropic
-
 from data_extractor.config.settings import Settings
 from data_extractor.core.models import ExtractionRequest, ExtractionResult
 from data_extractor.extractors.field_extractor import FieldExtractor
+from data_extractor.llm.base import BaseLLMClient
 from data_extractor.processors.index_mapper import IndexMapper
 from data_extractor.processors.text_processor import TextProcessor
 from data_extractor.readers.base import BaseReader
@@ -16,8 +15,31 @@ from data_extractor.utils.helpers import resolve_reader
 logger = logging.getLogger(__name__)
 
 
+def _build_llm_client(settings: Settings) -> BaseLLMClient:
+    """Instantiate the configured LLM backend from *settings*."""
+    if settings.llm_provider == "openai":
+        from data_extractor.llm.openai_client import OpenAIClient
+
+        return OpenAIClient(
+            api_key=settings.openai_api_key.get_secret_value(),  # type: ignore[union-attr]
+            model=settings.openai_model,
+            base_url=settings.openai_base_url,
+        )
+
+    from data_extractor.llm.anthropic_client import AnthropicClient
+
+    return AnthropicClient(
+        api_key=settings.anthropic_api_key.get_secret_value(),  # type: ignore[union-attr]
+        model=settings.anthropic_model,
+    )
+
+
 class Orchestrator:
     """Top-level component that wires readers, processors and extractors together.
+
+    The active LLM provider is determined at construction time via
+    :meth:`from_settings`.  Swap providers by changing ``LLM_PROVIDER``
+    in the environment – no code changes required.
 
     Usage::
 
@@ -42,13 +64,10 @@ class Orchestrator:
 
     @classmethod
     def from_settings(cls, settings: Settings) -> "Orchestrator":
-        """Factory that builds a fully-wired :class:`Orchestrator` from *settings*."""
-        client = anthropic.Anthropic(
-            api_key=settings.anthropic_api_key.get_secret_value()
-        )
+        """Factory – builds a fully-wired :class:`Orchestrator` from *settings*."""
+        llm_client = _build_llm_client(settings)
         mapper = IndexMapper(
-            client=client,
-            model=settings.anthropic_model,
+            llm_client=llm_client,
             max_tokens=settings.extraction_max_tokens,
         )
         extractor = FieldExtractor(

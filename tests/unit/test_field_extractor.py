@@ -1,8 +1,5 @@
 from unittest.mock import MagicMock
 
-import pytest
-
-from data_extractor.core.models import ExtractedField
 from data_extractor.extractors.field_extractor import FieldExtractor
 from data_extractor.processors.index_mapper import IndexMapper
 
@@ -11,7 +8,7 @@ def _make_extractor(mapper: IndexMapper, threshold: float = 0.0) -> FieldExtract
     return FieldExtractor(index_mapper=mapper, confidence_threshold=threshold)
 
 
-def test_extract_delegates_to_mapper(mock_anthropic_client: MagicMock, sample_fields):
+def test_extract_delegates_to_mapper(sample_fields):
     mapper = MagicMock(spec=IndexMapper)
     mapper.map.return_value = sample_fields
     extractor = _make_extractor(mapper)
@@ -40,5 +37,4 @@ def test_extract_passes_threshold_to_mapper():
 def test_extract_returns_empty_list_when_mapper_empty():
     mapper = MagicMock(spec=IndexMapper)
     mapper.map.return_value = []
-    extractor = _make_extractor(mapper)
-    assert extractor.extract("text", {}) == []
+    assert _make_extractor(mapper).extract("text", {}) == []
