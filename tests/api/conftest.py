@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from data_extractor.api.app import create_app
 from data_extractor.api.dependencies import get_orchestrator, get_schema_store, get_settings
+from data_extractor.api.rate_limit import check_extract_rate_limit
 from data_extractor.config.settings import Settings
 from data_extractor.core.models import ExtractedField, ExtractionRequest, ExtractionResult
 from data_extractor.registry.store import InMemorySchemaStore
@@ -68,6 +69,7 @@ def api_client(
     app.dependency_overrides[get_settings] = lambda: settings
     app.dependency_overrides[get_orchestrator] = lambda: orchestrator
     app.dependency_overrides[get_schema_store] = lambda: schema_store
+    app.dependency_overrides[check_extract_rate_limit] = lambda: None
     return TestClient(app)
 
 
@@ -81,4 +83,5 @@ def api_client_empty_result(tmp_pdf: Path, schema_store: InMemorySchemaStore) ->
     app.dependency_overrides[get_settings] = lambda: settings
     app.dependency_overrides[get_orchestrator] = lambda: orchestrator
     app.dependency_overrides[get_schema_store] = lambda: schema_store
+    app.dependency_overrides[check_extract_rate_limit] = lambda: None
     return TestClient(app)

@@ -20,7 +20,7 @@ from data_extractor.registry.store import InMemorySchemaStore
 def _pdf_upload(path: Path, schema: dict | None = None, extra_form: dict | None = None):
     req_body = json.dumps({"schema_definition": schema or {}})
     files = {"file": ("invoice.pdf", path.read_bytes(), "application/pdf")}
-    data = {"request": req_body, **(extra_form or {})}
+    data = {"options": req_body, **(extra_form or {})}
     return files, data
 
 
@@ -85,7 +85,7 @@ def test_extract_rejects_non_pdf(api_client: TestClient, tmp_path: Path):
 
 def test_extract_rejects_malformed_request_json(api_client: TestClient, tmp_pdf: Path):
     files = {"file": ("doc.pdf", tmp_pdf.read_bytes(), "application/pdf")}
-    r = api_client.post("/api/v1/extract", files=files, data={"request": "not json"})
+    r = api_client.post("/api/v1/extract", files=files, data={"options": "not json"})
     assert r.status_code == 422
 
 
@@ -155,14 +155,14 @@ def test_extract_with_schema_name(
         fields={"invoice_number": "The invoice ID"},
     ))
     files = {"file": ("doc.pdf", tmp_pdf.read_bytes(), "application/pdf")}
-    data = {"request": json.dumps({"schema_name": "invoice"})}
+    data = {"options": json.dumps({"schema_name": "invoice"})}
     r = api_client.post("/api/v1/extract", files=files, data=data)
     assert r.status_code == 200
 
 
 def test_extract_schema_name_not_found(api_client: TestClient, tmp_pdf: Path):
     files = {"file": ("doc.pdf", tmp_pdf.read_bytes(), "application/pdf")}
-    data = {"request": json.dumps({"schema_name": "nonexistent"})}
+    data = {"options": json.dumps({"schema_name": "nonexistent"})}
     r = api_client.post("/api/v1/extract", files=files, data=data)
     assert r.status_code == 400
     assert "not found in registry" in r.json()["detail"]
@@ -173,7 +173,7 @@ def test_inline_schema_takes_precedence_over_name(
 ):
     schema_store.save(SchemaEntry(name="invoice", fields={"vendor": "Vendor name"}))
     files = {"file": ("doc.pdf", tmp_pdf.read_bytes(), "application/pdf")}
-    data = {"request": json.dumps({
+    data = {"options": json.dumps({
         "schema_name": "invoice",
         "schema_definition": {"invoice_number": "The invoice ID"},
     })}
@@ -217,7 +217,7 @@ def test_schema_file_takes_precedence_over_inline(
         "file": ("doc.pdf", tmp_pdf.read_bytes(), "application/pdf"),
         "schema_file": ("schema.json", schema_json, "application/json"),
     }
-    data = {"request": json.dumps({"schema_definition": {"vendor": "Should be ignored"}})}
+    data = {"options": json.dumps({"schema_definition": {"vendor": "Should be ignored"}})}
     r = api_client.post("/api/v1/extract", files=files, data=data)
     assert r.status_code == 200
 
@@ -231,9 +231,35 @@ def test_schema_file_takes_precedence_over_name(
         "file": ("doc.pdf", tmp_pdf.read_bytes(), "application/pdf"),
         "schema_file": ("schema.json", schema_json, "application/json"),
     }
-    data = {"request": json.dumps({"schema_name": "invoice"})}
+    data = {"options": json.dumps({"schema_name": "invoice"})}
     r = api_client.post("/api/v1/extract", files=files, data=data)
     assert r.status_code == 200
+
+
+def test_extract_rate_limit_returns_429(tmp_pdf: Path):
+    import data_extractor.api.rate_limit as rl
+
+    # Override dependency with a limiter that triggers after 1 call
+    original_log, original_max = rl._log, rl._MAX_CALLS
+    rl._log = rl.defaultdict(list)
+    rl._MAX_CALLS = 1
+    try:
+        client = TestClient(create_app(), raise_server_exceptions=False)
+        settings = Settings(openai_api_key="sk-test", llm_provider="openai")
+        orch = MagicMock()
+        orch._field_extractor._confidence_threshold = 0.0
+        orch.run.return_value = MagicMock(
+            page_count=1, fields=[], metadata={}, to_index_dict=lambda: {}
+        )
+        client.app.dependency_overrides[get_settings] = lambda: settings
+        client.app.dependency_overrides[get_orchestrator] = lambda: orch
+        files = {"file": ("doc.pdf", tmp_pdf.read_bytes(), "application/pdf")}
+        client.post("/api/v1/extract", files=files)  # consumes the 1 allowed call
+        r = client.post("/api/v1/extract", files=files)  # should be 429
+        assert r.status_code == 429
+    finally:
+        rl._log = original_log
+        rl._MAX_CALLS = original_max
 
 
 def test_invalid_schema_file_returns_400(api_client: TestClient, tmp_pdf: Path):
