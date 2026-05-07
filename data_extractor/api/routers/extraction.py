@@ -1,12 +1,11 @@
-from __future__ import annotations
-
 import logging
 import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 
 from data_extractor.api.dependencies import OrchestratorDep, SchemaStoreDep
+from data_extractor.api.rate_limit import check_extract_rate_limit
 from data_extractor.api.schemas.requests import ExtractionRequestSchema
 from data_extractor.api.schemas.responses import ExtractionFieldSchema, ExtractionResponse
 from data_extractor.core.exceptions import ConfigurationError, DataExtractorError, ReaderError
@@ -23,6 +22,7 @@ _MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
 
 @router.post(
     "",
+    dependencies=[Depends(check_extract_rate_limit)],
     response_model=ExtractionResponse,
     status_code=status.HTTP_200_OK,
     summary="Extract structured fields from a PDF",
@@ -45,6 +45,7 @@ _MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
     responses={
         400: {"description": "Invalid file, unknown schema name, or malformed schema JSON"},
         422: {"description": "Validation error in request parameters"},
+        429: {"description": "Rate limit exceeded – max 10 requests per minute per IP"},
         500: {"description": "Internal extraction error"},
     },
 )
@@ -60,7 +61,7 @@ async def extract(
             'full format: {"fields": {"field_name": "description"}}.'
         ),
     ),
-    request: str = Form(
+    options: str = Form(
         default="{}",
         description=(
             "Optional JSON string with extra options: "
@@ -71,7 +72,7 @@ async def extract(
     _validate_upload(file)
 
     try:
-        req_schema = ExtractionRequestSchema.model_validate_json(request)
+        req_schema = ExtractionRequestSchema.model_validate_json(options)
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
