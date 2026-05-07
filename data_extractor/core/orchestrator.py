@@ -63,7 +63,7 @@ class Orchestrator:
         self._field_extractor = field_extractor
 
     @classmethod
-    def from_settings(cls, settings: Settings) -> "Orchestrator":
+    def from_settings(cls, settings: Settings) -> Orchestrator:
         """Factory – builds a fully-wired :class:`Orchestrator` from *settings*."""
         llm_client = _build_llm_client(settings)
         mapper = IndexMapper(

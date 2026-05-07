@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from data_extractor.registry.models import SchemaEntry
 
@@ -45,7 +45,7 @@ class InMemorySchemaStore(BaseSchemaStore):
         existing = self._store.get(entry.name)
         if existing:
             entry = entry.model_copy(
-                update={"updated_at": datetime.now(timezone.utc)}
+                update={"updated_at": datetime.now(UTC)}
             )
         self._store[entry.name] = entry
         return entry

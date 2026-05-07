@@ -6,8 +6,6 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
-
 from data_extractor.core.models import ExtractionRequest, ExtractionResult
 from data_extractor.core.orchestrator import Orchestrator
 from data_extractor.extractors.field_extractor import FieldExtractor
@@ -58,9 +56,10 @@ def test_full_pipeline_with_empty_schema(tmp_pdf: Path):
 
 
 def test_full_pipeline_confidence_filter(tmp_pdf: Path):
+    _f = {"source_text": None, "page_number": None}
     api_fields = [
-        {"name": "high", "value": "yes", "confidence": 0.9, "source_text": None, "page_number": None},
-        {"name": "low", "value": "no", "confidence": 0.1, "source_text": None, "page_number": None},
+        {"name": "high", "value": "yes", "confidence": 0.9, **_f},
+        {"name": "low", "value": "no", "confidence": 0.1, **_f},
     ]
     orch = _build_orchestrator(api_fields, threshold=0.5)
     result = orch.run(ExtractionRequest(
@@ -80,7 +79,8 @@ def test_full_pipeline_max_pages_respected(tmp_pdf: Path):
 def test_full_pipeline_openai_client_swappable(tmp_pdf: Path):
     """Verify that swapping to a different BaseLLMClient stub yields identical results."""
     fields = [
-        {"name": "vendor", "value": "Acme GmbH", "confidence": 0.88, "source_text": None, "page_number": None}
+        {"name": "vendor", "value": "Acme GmbH", "confidence": 0.88,
+         "source_text": None, "page_number": None},
     ]
     # Build with one stub
     orch1 = _build_orchestrator(fields)

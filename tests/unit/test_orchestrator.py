@@ -1,15 +1,11 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from data_extractor.core.models import ExtractionRequest, ExtractionResult
 from data_extractor.core.orchestrator import Orchestrator, _build_llm_client
 from data_extractor.extractors.field_extractor import FieldExtractor
-from data_extractor.llm.base import BaseLLMClient
 from data_extractor.processors.text_processor import TextProcessor
 from data_extractor.readers.pdf_reader import PdfReader
-
 
 # ---------------------------------------------------------------------------
 # Helpers

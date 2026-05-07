@@ -1,8 +1,10 @@
+from unittest.mock import MagicMock
+
+from fastapi.testclient import TestClient
+
 from data_extractor.api.app import create_app
 from data_extractor.api.dependencies import get_orchestrator, get_settings
 from data_extractor.config.settings import Settings
-from fastapi.testclient import TestClient
-from unittest.mock import MagicMock
 
 
 def _client() -> TestClient:

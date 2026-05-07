@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -12,7 +11,7 @@ from fastapi.testclient import TestClient
 from data_extractor.api.app import create_app
 from data_extractor.api.dependencies import get_orchestrator, get_schema_store, get_settings
 from data_extractor.config.settings import Settings
-from data_extractor.core.models import ExtractedField, ExtractionResult, ExtractionRequest
+from data_extractor.core.models import ExtractedField, ExtractionRequest, ExtractionResult
 from data_extractor.registry.store import InMemorySchemaStore
 
 
@@ -58,7 +57,9 @@ def schema_store() -> InMemorySchemaStore:
 
 
 @pytest.fixture()
-def api_client(tmp_pdf: Path, sample_fields: list[ExtractedField], schema_store: InMemorySchemaStore) -> TestClient:
+def api_client(
+    tmp_pdf: Path, sample_fields: list[ExtractedField], schema_store: InMemorySchemaStore
+) -> TestClient:
     """TestClient with mocked settings, orchestrator, and fresh schema store."""
     app = create_app()
     settings = _make_settings()
