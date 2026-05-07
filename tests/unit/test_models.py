@@ -5,7 +5,6 @@ from pydantic import ValidationError
 
 from data_extractor.core.models import ExtractedField, ExtractionRequest, ExtractionResult
 
-
 # ---------------------------------------------------------------------------
 # ExtractedField
 # ---------------------------------------------------------------------------

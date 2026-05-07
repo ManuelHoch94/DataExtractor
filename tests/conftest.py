@@ -13,7 +13,6 @@ import pytest
 from data_extractor.core.models import ExtractedField
 from data_extractor.llm.base import BaseLLMClient, LLMResponse
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

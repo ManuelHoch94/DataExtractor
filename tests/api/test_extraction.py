@@ -4,17 +4,14 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
 from fastapi.testclient import TestClient
 
 from data_extractor.api.app import create_app
-from data_extractor.api.dependencies import get_orchestrator, get_schema_store, get_settings
+from data_extractor.api.dependencies import get_orchestrator, get_settings
 from data_extractor.config.settings import Settings
 from data_extractor.core.exceptions import DataExtractorError, ReaderError
-from data_extractor.core.models import ExtractedField, ExtractionRequest, ExtractionResult
 from data_extractor.registry.models import SchemaEntry
 from data_extractor.registry.store import InMemorySchemaStore
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -150,7 +147,9 @@ def test_redoc_available(api_client: TestClient):
 # schema_name resolution
 # ---------------------------------------------------------------------------
 
-def test_extract_with_schema_name(api_client: TestClient, tmp_pdf: Path, schema_store: InMemorySchemaStore):
+def test_extract_with_schema_name(
+    api_client: TestClient, tmp_pdf: Path, schema_store: InMemorySchemaStore
+):
     schema_store.save(SchemaEntry(
         name="invoice",
         fields={"invoice_number": "The invoice ID"},

@@ -1,5 +1,6 @@
-import data_extractor
 from fastapi.testclient import TestClient
+
+import data_extractor
 
 
 def test_health_returns_200(api_client: TestClient):

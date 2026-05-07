@@ -43,9 +43,10 @@ def test_map_empty_schema_returns_empty(mock_llm_client: MagicMock):
 
 
 def test_map_applies_confidence_threshold():
+    _f = {"source_text": None, "page_number": None}
     client = _mock_client([
-        {"name": "high", "value": "yes", "confidence": 0.9, "source_text": None, "page_number": None},
-        {"name": "low", "value": "maybe", "confidence": 0.2, "source_text": None, "page_number": None},
+        {"name": "high", "value": "yes", "confidence": 0.9, **_f},
+        {"name": "low", "value": "maybe", "confidence": 0.2, **_f},
     ])
     mapper = _make_mapper(client)
     result = mapper.map("text", {"high": "desc", "low": "desc"}, confidence_threshold=0.5)

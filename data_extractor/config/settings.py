@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
     @model_validator(mode="after")
-    def _require_active_provider_key(self) -> "Settings":
+    def _require_active_provider_key(self) -> Settings:
         if self.llm_provider == "openai" and not self.openai_api_key:
             raise ValueError(
                 "openai_api_key is required when llm_provider='openai'."

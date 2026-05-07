@@ -69,7 +69,12 @@ def test_anthropic_provider_valid(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_anthropic_custom_model(monkeypatch: pytest.MonkeyPatch):
-    _base_env(monkeypatch, LLM_PROVIDER="anthropic", ANTHROPIC_API_KEY="sk-x", ANTHROPIC_MODEL="claude-opus-4-7")
+    _base_env(
+        monkeypatch,
+        LLM_PROVIDER="anthropic",
+        ANTHROPIC_API_KEY="sk-x",
+        ANTHROPIC_MODEL="claude-opus-4-7",
+    )
     s = Settings()
     assert s.anthropic_model == "claude-opus-4-7"
 

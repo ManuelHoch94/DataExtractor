@@ -1,6 +1,5 @@
 """Tests for the LLM abstraction layer."""
 
-from unittest.mock import MagicMock
 
 import pytest
 
